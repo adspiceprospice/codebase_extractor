@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-"""
-Codebase Extractor - A tool to extract and combine code from an entire codebase
-"""
 
 import os
 import sys

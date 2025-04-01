@@ -1,6 +1,6 @@
 # Codebase Extractor
 
-A powerful Python tool to extract and combine code from an entire codebase into a single text file. Perfect for code reviews, documentation, analyzing project structure, or creating a comprehensive view of your project.
+A simple Python tool to extract and combine code from an entire codebase into a single text file for using with LLM's. 
 
 ## Features
 
