@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 import os
 import sys
 import argparse
@@ -92,6 +93,34 @@ def should_exclude(path: str, exclusions: List[str]) -> bool:
     return False
 
 
+def should_include_content(path: str, root_dir: str, include_patterns: List[str]) -> bool:
+    """
+    Check if a file's content should be included based on inclusion patterns.
+    When no include patterns are specified, all files are included.
+    """
+    if not include_patterns:
+        return True
+    
+    # Get relative path to match against patterns
+    rel_path = os.path.relpath(path, root_dir)
+    rel_path_norm = rel_path.replace("\\", "/")  # Normalize path separators
+    
+    for pattern in include_patterns:
+        # Support for wildcards in patterns
+        if fnmatch.fnmatch(rel_path, pattern) or fnmatch.fnmatch(rel_path_norm, pattern):
+            return True
+        
+        # Check if the pattern directly matches the path
+        if rel_path == pattern or rel_path_norm == pattern:
+            return True
+        
+        # Check if we're dealing with just a filename match (basename)
+        if os.path.basename(rel_path) == pattern:
+            return True
+    
+    return False
+
+
 def is_binary_file(path: str) -> bool:
     """
     Check if a file is binary by reading the first few bytes.
@@ -134,7 +163,14 @@ def read_file(path: str) -> str:
     return "[File encoding not supported]"
 
 
-def process_codebase(root_dir: str, output_file: str, exclusions: List[str], show_progress: bool = True, overwrite: bool = False) -> None:
+def process_codebase(
+    root_dir: str, 
+    output_file: str, 
+    exclusions: List[str], 
+    include_patterns: List[str] = None,
+    show_progress: bool = True, 
+    overwrite: bool = False
+) -> None:
     """
     Process the codebase and write the output file.
     """
@@ -161,7 +197,9 @@ def process_codebase(root_dir: str, output_file: str, exclusions: List[str], sho
     
     # Collect all files
     all_files = []
+    included_files = []
     total_size = 0
+    included_size = 0
     
     print(f"📊 Scanning directory: {root_dir}")
     start_time = time.time()
@@ -180,9 +218,28 @@ def process_codebase(root_dir: str, output_file: str, exclusions: List[str], sho
             if not should_exclude(file_path, exclusions):
                 all_files.append(file_path)
                 total_size += os.path.getsize(file_path)
+                
+                # Check if we should include this file's content
+                if should_include_content(file_path, root_dir, include_patterns):
+                    included_files.append(file_path)
+                    included_size += os.path.getsize(file_path)
     
     scan_time = time.time() - start_time
-    print(f"📝 Found {len(all_files)} files to process (total size: {total_size/1024/1024:.2f} MB) in {scan_time:.2f}s")
+    
+    # Report on all found files and those selected for content inclusion
+    if include_patterns:
+        print(f"📝 Found {len(all_files)} total files (total size: {total_size/1024/1024:.2f} MB)")
+        print(f"📑 Selected {len(included_files)} files for content inclusion (size: {included_size/1024/1024:.2f} MB)")
+        if len(included_files) == 0:
+            print(f"⚠️ Warning: No files matched the inclusion patterns: {include_patterns}")
+            choice = input("Continue with just directory structure? [y/N]: ").strip().lower()
+            if choice != 'y' and choice != 'yes':
+                print("❌ Operation cancelled.")
+                return
+    else:
+        print(f"📝 Found {len(all_files)} files to process (total size: {total_size/1024/1024:.2f} MB)")
+    
+    print(f"⏱️ Scan completed in {scan_time:.2f}s")
     
     # Generate tree
     print(f"🌳 Generating directory tree...")
@@ -198,21 +255,24 @@ def process_codebase(root_dir: str, output_file: str, exclusions: List[str], sho
     all_content = ""
     total_tokens = 0
     
+    # Determine which files to process for content
+    files_to_process = included_files if include_patterns else all_files
+    
     # Setup progress bar
     if TQDM_AVAILABLE and show_progress:
-        pbar = tqdm(all_files, unit="file")
+        pbar = tqdm(files_to_process, unit="file")
     else:
-        pbar = all_files
-        print(f"⚙️ Progress: 0/{len(all_files)} files processed", end="\r")
+        pbar = files_to_process
+        print(f"⚙️ Progress: 0/{len(files_to_process)} files processed", end="\r")
         progress_count = 0
     
     for file_path in pbar:
         if TQDM_AVAILABLE and show_progress:
             pbar.set_description(f"Processing {os.path.basename(file_path)}")
-        elif show_progress and len(all_files) > 0:
+        elif show_progress and len(files_to_process) > 0:
             progress_count += 1
-            percent = (progress_count / len(all_files)) * 100
-            print(f"⚙️ Progress: {progress_count}/{len(all_files)} files processed ({percent:.1f}%)", end="\r")
+            percent = (progress_count / len(files_to_process)) * 100
+            print(f"⚙️ Progress: {progress_count}/{len(files_to_process)} files processed ({percent:.1f}%)", end="\r")
         
         # Get relative path
         rel_path = os.path.relpath(file_path, root_dir)
@@ -242,14 +302,25 @@ def process_codebase(root_dir: str, output_file: str, exclusions: List[str], sho
         # Write token count
         f.write(f"Total Tokens: {total_tokens}\n\n")
         
+        # Note about selective inclusion if applicable
+        if include_patterns:
+            f.write(f"Note: Only selected files are included with content. Inclusion patterns: {', '.join(include_patterns)}\n\n")
+        
         # Write file tree
         f.write(f"Directory Structure:\n\n{tree}\n\n")
         
-        # Write list of files
-        f.write("Files Included:\n\n")
+        # Write list of all files
+        f.write("All Files (Structure Only):\n\n")
         for file_path in all_files:
             rel_path = os.path.relpath(file_path, root_dir)
             f.write(f"- {rel_path}\n")
+        
+        # If selective inclusion, write list of included files
+        if include_patterns:
+            f.write("\nFiles With Content Included:\n\n")
+            for file_path in included_files:
+                rel_path = os.path.relpath(file_path, root_dir)
+                f.write(f"- {rel_path}\n")
         
         # Write all content
         f.write(all_content)
@@ -260,6 +331,25 @@ def process_codebase(root_dir: str, output_file: str, exclusions: List[str], sho
     print(f"💾 Output file written in {write_time:.2f}s")
     print(f"✅ Extraction complete! Total tokens: {total_tokens}")
     print(f"⏱️ Total time: {total_time:.2f}s")
+
+
+def parse_include_patterns(patterns_arg: str) -> List[str]:
+    """
+    Parse include patterns from command line argument.
+    Supports both comma-separated and space-separated formats.
+    """
+    if not patterns_arg:
+        return []
+    
+    # First try comma-separation
+    patterns = [p.strip() for p in patterns_arg.split(',')]
+    
+    # If only one pattern was found, try space-separation
+    if len(patterns) == 1:
+        patterns = [p.strip() for p in patterns_arg.split()]
+    
+    # Filter out empty patterns
+    return [p for p in patterns if p]
 
 
 def main():
@@ -292,6 +382,8 @@ def main():
                         help="Output file name (default: codebase_extract.txt)")
     parser.add_argument("--exclude", "-e", dest="exclusions", action="append", default=None,
                         help="Exclude patterns (can be used multiple times)")
+    parser.add_argument("--include", "-i", dest="include", default=None,
+                        help="Only include content for these files (space or comma separated)")
     parser.add_argument("--no-defaults", dest="no_defaults", action="store_true",
                         help="Don't use default exclusions")
     parser.add_argument("--no-progress", dest="no_progress", action="store_true",
@@ -308,8 +400,18 @@ def main():
     if args.exclusions:
         exclusions.extend(args.exclusions)
     
+    # Process inclusion patterns
+    include_patterns = parse_include_patterns(args.include) if args.include else None
+    
     # Process the codebase
-    process_codebase(args.root_dir, args.output_file, exclusions, not args.no_progress, args.force)
+    process_codebase(
+        args.root_dir, 
+        args.output_file, 
+        exclusions,
+        include_patterns, 
+        not args.no_progress, 
+        args.force
+    )
 
 
 if __name__ == "__main__":
