@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import os
 import sys
 import argparse
@@ -135,7 +134,7 @@ def read_file(path: str) -> str:
     return "[File encoding not supported]"
 
 
-def process_codebase(root_dir: str, output_file: str, exclusions: List[str], show_progress: bool = True) -> None:
+def process_codebase(root_dir: str, output_file: str, exclusions: List[str], show_progress: bool = True, overwrite: bool = False) -> None:
     """
     Process the codebase and write the output file.
     """
@@ -145,6 +144,20 @@ def process_codebase(root_dir: str, output_file: str, exclusions: List[str], sho
     
     # Get absolute path
     root_dir = os.path.abspath(root_dir)
+    output_file_abs = os.path.abspath(output_file)
+    
+    # Check if output file already exists
+    if os.path.exists(output_file_abs) and not overwrite:
+        print(f"⚠️ Warning: Output file '{output_file}' already exists.")
+        response = input("Do you want to overwrite it? [y/N]: ").strip().lower()
+        if response != 'y' and response != 'yes':
+            print("❌ Operation cancelled.")
+            return
+    
+    # Always exclude the output file from being processed
+    output_file_name = os.path.basename(output_file_abs)
+    if output_file_name not in exclusions:
+        exclusions.append(output_file_name)
     
     # Collect all files
     all_files = []
@@ -159,6 +172,11 @@ def process_codebase(root_dir: str, output_file: str, exclusions: List[str], sho
         
         for file in files:
             file_path = os.path.join(root, file)
+            
+            # Skip the output file itself
+            if os.path.abspath(file_path) == output_file_abs:
+                continue
+                
             if not should_exclude(file_path, exclusions):
                 all_files.append(file_path)
                 total_size += os.path.getsize(file_path)
@@ -278,6 +296,8 @@ def main():
                         help="Don't use default exclusions")
     parser.add_argument("--no-progress", dest="no_progress", action="store_true",
                         help="Don't show progress bar")
+    parser.add_argument("--force", "-f", dest="force", action="store_true",
+                        help="Force overwrite if output file exists")
     
     args = parser.parse_args()
     
@@ -289,7 +309,7 @@ def main():
         exclusions.extend(args.exclusions)
     
     # Process the codebase
-    process_codebase(args.root_dir, args.output_file, exclusions, not args.no_progress)
+    process_codebase(args.root_dir, args.output_file, exclusions, not args.no_progress, args.force)
 
 
 if __name__ == "__main__":

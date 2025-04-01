@@ -1,7 +1,7 @@
 # Codebase Extractor
 
-A simple Python tool to extract and combine code from an entire codebase into a single text file for using with LLM's. 
-
+A simple Python tool to extract and combine code from an entire codebase into a single text file for simplifying workflows when using LLM's.
+ 
 ## Features
 
 - 📂 **Complete Directory Traversal** - Scans your entire codebase (all directories and subdirectories)
@@ -10,6 +10,7 @@ A simple Python tool to extract and combine code from an entire codebase into a 
 - 📝 **Token Counting** - Get a rough estimate of the codebase size in tokens
 - 🖥️ **Console Feedback** - Visual progress indicators during processing
 - ⚙️ **Flexible Configuration** - Command-line arguments for easy customization
+- 🛡️ **Safe Extraction** - Prevents recursively indexing previous extraction files
 - 🔄 **Cross-platform** - Works on Windows, macOS, and Linux
 
 ## Installation
@@ -22,7 +23,7 @@ A simple Python tool to extract and combine code from an entire codebase into a 
 
 ```bash
 # Clone the repository
-git clone https://github.com/adspiceprospice/codebase_extractor
+git clone https://github.com/YOUR_USERNAME/codebase_extractor.git
 cd codebase_extractor
 
 # Optional: Install dependencies for progress bar
@@ -46,7 +47,7 @@ This will extract all files from the current directory (excluding default binary
 ### Custom Usage
 
 ```bash
-python codebase_extractor.py --root /path/to/your/project --output project_extract.txt --exclude "*.log" --exclude "temp/"
+python codebase_extractor.py --root /path/to/your/project --output project_extract.txt --exclude "*.log" --exclude "temp/" --force
 ```
 
 ### Command-line Options
@@ -58,6 +59,7 @@ python codebase_extractor.py --root /path/to/your/project --output project_extra
 | `--exclude` | `-e` | Exclude patterns (can be used multiple times) |
 | `--no-defaults` | | Don't use default exclusions |
 | `--no-progress` | | Don't show progress bar |
+| `--force` | `-f` | Force overwrite if output file exists (skips confirmation prompt) |
 
 ### Exclude Patterns
 
@@ -66,6 +68,16 @@ You can exclude files and directories using patterns:
 - `*.ext` - Exclude all files with the extension `.ext`
 - `dir_name/` - Exclude directory named `dir_name`
 - `filename` - Exclude files named `filename`
+
+## Smart Prevention of Self-Indexing
+
+The tool automatically prevents indexing its own output files:
+
+- Automatically excludes the output file from the indexing process
+- Detects previous extraction files with the same name
+- Prompts for confirmation before overwriting (unless `--force` is used)
+
+This prevents recursive indexing problems and improves overall reliability.
 
 ## Example Output
 
