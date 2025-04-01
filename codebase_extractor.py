@@ -97,6 +97,11 @@ def should_include_content(path: str, root_dir: str, include_patterns: List[str]
     """
     Check if a file's content should be included based on inclusion patterns.
     When no include patterns are specified, all files are included.
+    
+    Supports:
+    - Individual files by name or path
+    - Wildcards for matching multiple files
+    - Directory paths to include all files within a directory and its subdirectories
     """
     if not include_patterns:
         return True
@@ -106,16 +111,26 @@ def should_include_content(path: str, root_dir: str, include_patterns: List[str]
     rel_path_norm = rel_path.replace("\\", "/")  # Normalize path separators
     
     for pattern in include_patterns:
-        # Support for wildcards in patterns
-        if fnmatch.fnmatch(rel_path, pattern) or fnmatch.fnmatch(rel_path_norm, pattern):
+        # Check for directory pattern (ending with '/')
+        if pattern.endswith('/'):
+            # Check if file is inside this directory or any of its subdirectories
+            dir_path = pattern
+            if rel_path_norm.startswith(dir_path) or rel_path.startswith(dir_path):
+                return True
+        # Check if pattern doesn't end with '/' but is a directory
+        elif not pattern.endswith('/') and os.path.isdir(os.path.join(root_dir, pattern)):
+            # Ensure pattern has trailing slash for proper directory matching
+            dir_path = pattern if pattern.endswith('/') else pattern + '/'
+            if rel_path_norm.startswith(dir_path) or rel_path.startswith(dir_path):
+                return True
+        # Regular file patterns with wildcards
+        elif fnmatch.fnmatch(rel_path, pattern) or fnmatch.fnmatch(rel_path_norm, pattern):
             return True
-        
-        # Check if the pattern directly matches the path
-        if rel_path == pattern or rel_path_norm == pattern:
+        # Exact file match
+        elif rel_path == pattern or rel_path_norm == pattern:
             return True
-        
-        # Check if we're dealing with just a filename match (basename)
-        if os.path.basename(rel_path) == pattern:
+        # Basename match
+        elif os.path.basename(rel_path) == pattern:
             return True
     
     return False
@@ -163,6 +178,30 @@ def read_file(path: str) -> str:
     return "[File encoding not supported]"
 
 
+def normalize_include_patterns(patterns: List[str], root_dir: str) -> List[str]:
+    """
+    Normalize inclusion patterns to handle directories consistently.
+    
+    For directory patterns:
+    - Ensure they end with a trailing slash
+    - If a pattern is a valid directory but doesn't end with '/', add the trailing '/'
+    """
+    normalized = []
+    
+    for pattern in patterns:
+        # Check if the pattern is a directory path
+        pattern_path = os.path.join(root_dir, pattern)
+        
+        if os.path.isdir(pattern_path):
+            # Ensure directory patterns end with a trailing slash
+            if not pattern.endswith('/'):
+                pattern = pattern + '/'
+        
+        normalized.append(pattern)
+    
+    return normalized
+
+
 def process_codebase(
     root_dir: str, 
     output_file: str, 
@@ -194,6 +233,10 @@ def process_codebase(
     output_file_name = os.path.basename(output_file_abs)
     if output_file_name not in exclusions:
         exclusions.append(output_file_name)
+    
+    # Normalize include patterns to handle directories consistently
+    if include_patterns:
+        include_patterns = normalize_include_patterns(include_patterns, root_dir)
     
     # Collect all files
     all_files = []
@@ -383,7 +426,7 @@ def main():
     parser.add_argument("--exclude", "-e", dest="exclusions", action="append", default=None,
                         help="Exclude patterns (can be used multiple times)")
     parser.add_argument("--include", "-i", dest="include", default=None,
-                        help="Only include content for these files (space or comma separated)")
+                        help="Only include content for these files or directories (space or comma separated)")
     parser.add_argument("--no-defaults", dest="no_defaults", action="store_true",
                         help="Don't use default exclusions")
     parser.add_argument("--no-progress", dest="no_progress", action="store_true",

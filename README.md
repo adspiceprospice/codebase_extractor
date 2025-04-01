@@ -1,6 +1,10 @@
 # Codebase Extractor
 
-A simple Python tool to extract and combine code from an entire codebase into a single text file for simplifying workflows when using LLM's.
+A simple Python tool to extract and combine code from an entire codebase into a single text file for simplifying workflows when using LLM's. If i get feedback that this is useful, I'll add more features and probably make a free mac app out of it.
+
+# Codebase Extractor
+
+A powerful Python tool to extract and combine code from an entire codebase into a single text file. Perfect for code reviews, documentation, analyzing project structure, or creating a comprehensive view of your project.
 
 ## Features
 
@@ -11,7 +15,7 @@ A simple Python tool to extract and combine code from an entire codebase into a 
 - 🖥️ **Console Feedback** - Visual progress indicators during processing
 - ⚙️ **Flexible Configuration** - Command-line arguments for easy customization
 - 🛡️ **Safe Extraction** - Prevents recursively indexing previous extraction files
-- 📎 **Selective Inclusion** - Include only specified files' content while maintaining full structure
+- 📎 **Selective Inclusion** - Include only specified files/folders while maintaining full structure
 - 🔄 **Cross-platform** - Works on Windows, macOS, and Linux
 
 ## Installation
@@ -53,19 +57,21 @@ python codebase_extractor.py --root /path/to/your/project --output project_extra
 
 ### Selective Content Inclusion
 
-To include only specific files in the content (while still mapping the entire directory structure):
+To include only specific files and folders in the content (while still mapping the entire directory structure):
 
 ```bash
-# Space-separated file list
-python codebase_extractor.py --include "main.py utils/helpers.py models/user.py"
+# Include specific files and an entire folder (with all its subfolders)
+python codebase_extractor.py --include "README.md src/main.py src/core/"
 
-# OR comma-separated file list
-python codebase_extractor.py --include "main.py,utils/helpers.py,models/user.py"
+# OR comma-separated list
+python codebase_extractor.py --include "README.md,src/main.py,src/core/"
 ```
+
+When you specify a folder path (with or without a trailing slash), the script will include all files in that folder and all its subfolders.
 
 This is particularly useful when preparing extracts for AI tools like Large Language Models (LLMs) where you want to:
 - Give the AI the complete project structure for context
-- Only include the specific files that are relevant to your current task
+- Include specific files and entire directories that are relevant to your current task
 - Reduce token usage by omitting irrelevant file contents
 
 ### Command-line Options
@@ -75,7 +81,7 @@ This is particularly useful when preparing extracts for AI tools like Large Lang
 | `--root` | `-r` | Root directory to start extraction (default: current directory) |
 | `--output` | `-o` | Output file name (default: codebase_extract.txt) |
 | `--exclude` | `-e` | Exclude patterns (can be used multiple times) |
-| `--include` | `-i` | Only include content for specific files (space or comma separated) |
+| `--include` | `-i` | Only include content for specific files/folders (space or comma separated) |
 | `--no-defaults` | | Don't use default exclusions |
 | `--no-progress` | | Don't show progress bar |
 | `--force` | `-f` | Force overwrite if output file exists (skips confirmation prompt) |
@@ -90,12 +96,35 @@ You can exclude files and directories using patterns:
 
 ### Include Patterns
 
-You can specify which files to include in several ways:
+You can specify which content to include in several ways:
 
-- `filename.ext` - Just the filename (will match in any directory)
-- `dir/filename.ext` - Relative path from the root directory
-- `*.py` - Wildcard pattern to include all Python files
-- `models/*.py` - Wildcard pattern to include Python files in a specific directory
+- Individual files:
+  - `filename.ext` - Just the filename (will match in any directory)
+  - `dir/filename.ext` - Relative path from the root directory
+  - `*.py` - Wildcard pattern to include all Python files
+  - `models/*.py` - Wildcard pattern to include Python files in a specific directory
+
+- Entire directories:
+  - `src/core/` - Include all files in the core directory and its subdirectories
+  - `src/core` - Same as above (trailing slash is optional for directories)
+
+## Example Use Case
+
+Imagine you're working on a feature in the `src/core/` module and want to consult an LLM. You can create an extract with:
+
+```bash
+python codebase_extractor.py --include "README.md,src/index.ts,src/core/,src/tools/base-tool.ts"
+```
+
+This will:
+1. Map your entire project structure (for context)
+2. Include content from:
+   - README.md
+   - src/index.ts
+   - ALL files in src/core/ and ALL its subdirectories
+   - src/tools/base-tool.ts
+
+Perfect for focused AI assistance with minimal token usage!
 
 ## Smart Prevention of Self-Indexing
 
@@ -114,43 +143,54 @@ The generated file will have this structure:
 ```
 Total Tokens: 12345
 
-Note: Only selected files are included with content. Inclusion patterns: main.py, utils/helpers.py
+Note: Only selected files are included with content. Inclusion patterns: README.md, src/index.ts, src/core/, src/tools/base-tool.ts
 
 Directory Structure:
 
+├── README.md
+├── package.json
 ├── src
-│   ├── main.py
-│   ├── utils
-│   │   ├── helpers.py
-│   │   └── config.py
-│   └── models
-│       └── user.py
-├── tests
-│   └── test_main.py
-└── README.md
+│   ├── index.ts
+│   ├── core
+│   │   ├── config.ts
+│   │   ├── models
+│   │   │   └── user.ts
+│   │   └── services
+│   │       └── auth.ts
+│   └── tools
+│       ├── base-tool.ts
+│       └── specific-tool.ts
+└── tests
+    └── core
+        └── user.test.ts
 
 All Files (Structure Only):
 
-- src/main.py
-- src/utils/helpers.py
-- src/utils/config.py
-- src/models/user.py
-- tests/test_main.py
 - README.md
+- package.json
+- src/index.ts
+- src/core/config.ts
+- src/core/models/user.ts
+- src/core/services/auth.ts
+- src/tools/base-tool.ts
+- src/tools/specific-tool.ts
+- tests/core/user.test.ts
 
 Files With Content Included:
 
-- src/main.py
-- src/utils/helpers.py
+- README.md
+- src/index.ts
+- src/core/config.ts
+- src/core/models/user.ts
+- src/core/services/auth.ts
+- src/tools/base-tool.ts
 
 ================================================================================
-src/main.py
+README.md
 ================================================================================
-#!/usr/bin/env python3
-"""
-Main application entry point
-"""
-...
+# Project Title
+
+This is a sample project...
 ```
 
 ## Default Exclusions
@@ -185,8 +225,9 @@ The tool is optimized to handle large codebases efficiently:
 - **Onboarding**: Help new team members understand project structure
 - **Archiving**: Create text-based snapshots of your codebase
 - **AI Tools**: Prepare your codebase for analysis by AI tools or LLMs
-  - **Token Optimization**: Include only specific files' content to reduce token usage with LLMs
+  - **Token Optimization**: Include only specific files/folders content to reduce token usage with LLMs
   - **Context Preservation**: Keep the full directory structure for better context awareness
+  - **Targeted Analysis**: Focus AI on specific parts of your codebase like one module and its dependencies
 
 ## Limitations
 
