@@ -212,18 +212,6 @@ Directory Structure:
     └── core
         └── user.test.ts
 
-All Files (Structure Only):
-
-- README.md
-- package.json
-- src/index.ts
-- src/core/config.ts
-- src/core/models/user.ts
-- src/core/services/auth.ts
-- src/tools/base-tool.ts
-- src/tools/specific-tool.ts
-- tests/core/user.test.ts
-
 Files With Content Included:
 
 - README.md
@@ -257,8 +245,8 @@ DEFAULT_EXCLUSIONS = [
     '*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.svg', '*.ico',
     '*.mp3', '*.mp4', '*.wav', '*.flac', '*.ogg', '*.avi', '*.mov',
     '*.zip', '*.tar', '*.gz', '*.bz2', '*.xz', '*.rar', '*.7z',
-    '*.pdf', '*.doc', '*.docx', '*.ppt', '*.pptx', '*.xls', '*.xlsx',
-    '.git/', '.svn/', '.hg/', '.idea/', '.vscode/', '__pycache__/', 'node_modules/',
+    '*.pdf', '*.doc', '*.docx', '*.ppt', '*.pptx', '*.xls', '*.xlsx', '.env',
+    '.git/', '.svn/', '.hg/', '.idea/', '.vscode/', '__pycache__/', 'node_modules/', '.next/',
     'venv/', 'env/', '.env/', '.venv/', 'build/', 'dist/', 'site-packages/',
     '.DS_Store', 'Thumbs.db'
 ]

@@ -28,8 +28,8 @@ DEFAULT_EXCLUSIONS = [
     '*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp', '*.svg', '*.ico',
     '*.mp3', '*.mp4', '*.wav', '*.flac', '*.ogg', '*.avi', '*.mov',
     '*.zip', '*.tar', '*.gz', '*.bz2', '*.xz', '*.rar', '*.7z',
-    '*.pdf', '*.doc', '*.docx', '*.ppt', '*.pptx', '*.xls', '*.xlsx',
-    '.git/', '.svn/', '.hg/', '.idea/', '.vscode/', '__pycache__/', 'node_modules/',
+    '*.pdf', '*.doc', '*.docx', '*.ppt', '*.pptx', '*.xls', '*.xlsx', '.env',
+    '.git/', '.svn/', '.hg/', '.idea/', '.vscode/', '__pycache__/', 'node_modules/', '.next/',
     'venv/', 'env/', '.env/', '.venv/', 'build/', 'dist/', 'site-packages/',
     '.DS_Store', 'Thumbs.db'
 ]
@@ -240,7 +240,7 @@ def process_codebase(
     output_file: str, 
     exclusions: List[str], 
     include_patterns: List[str] = None,
-    token_model: str = "gpt-4",
+    token_model: str = "gpt-4o",
     show_progress: bool = True, 
     overwrite: bool = False
 ) -> None:
@@ -395,14 +395,10 @@ def process_codebase(
     
     # Tree and file lists
     tree_content = f"Directory Structure:\n\n{tree}\n\n"
-    tree_content += "All Files (Structure Only):\n\n"
-    for file_path in all_files:
-        rel_path = os.path.relpath(file_path, root_dir)
-        tree_content += f"- {rel_path}\n"
     
     # If selective inclusion, list included files
     if include_patterns:
-        tree_content += "\nFiles With Content Included:\n\n"
+        tree_content += "Files With Content Included:\n\n"
         for file_path in included_files:
             rel_path = os.path.relpath(file_path, root_dir)
             tree_content += f"- {rel_path}\n"
@@ -493,8 +489,8 @@ def main():
                         help="Exclude patterns (can be used multiple times)")
     parser.add_argument("--include", "-i", dest="include", default=None,
                         help="Only include content for these files or directories (space or comma separated)")
-    parser.add_argument("--model", "-m", dest="token_model", default="gpt-4",
-                        help="Model to use for token counting (default: gpt-4)")
+    parser.add_argument("--model", "-m", dest="token_model", default="gpt-4o",
+                        help="Model to use for token counting (default: gpt-4o)")
     parser.add_argument("--no-defaults", dest="no_defaults", action="store_true",
                         help="Don't use default exclusions")
     parser.add_argument("--no-progress", dest="no_progress", action="store_true",
