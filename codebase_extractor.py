@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 import os
 import sys
 import argparse
@@ -15,6 +14,13 @@ try:
 except ImportError:
     TQDM_AVAILABLE = False
 
+# Try to import tiktoken for accurate token counting, handle if not installed
+try:
+    import tiktoken
+    TIKTOKEN_AVAILABLE = True
+except ImportError:
+    TIKTOKEN_AVAILABLE = False
+
 # Default exclusions (common binary files, hidden files, etc.)
 DEFAULT_EXCLUSIONS = [
     '*.pyc', '*.pyo', '*.so', '*.o', '*.a', '*.dll', '*.lib', '*.dylib',
@@ -29,13 +35,40 @@ DEFAULT_EXCLUSIONS = [
 ]
 
 
-def count_tokens(text: str) -> int:
+def count_tokens(text: str, model: str = "gpt-4o") -> int:
     """
-    Count tokens in a string using a simple whitespace-based approach.
-    For a more accurate count, you might want to use a proper tokenizer.
+    Count tokens in a string using OpenAI's tiktoken if available,
+    or a simple whitespace-based approach as fallback.
+    
+    Args:
+        text: The text to count tokens for
+        model: The model to use for counting tokens (e.g., 'gpt-4o', 'o3-mini')
+    
+    Returns:
+        int: The number of tokens
     """
-    # Simple tokenization by splitting on whitespace
-    return len(text.split())
+    if TIKTOKEN_AVAILABLE:
+        try:
+            # Try to get the encoding for the specified model
+            encoding = tiktoken.encoding_for_model(model)
+        except KeyError:
+            # If the model is not found, try to use cl100k_base encoding (used by many models)
+            try:
+                encoding = tiktoken.get_encoding("cl100k_base")
+            except KeyError:
+                # Fallback to p50k_base if cl100k is not available
+                try:
+                    encoding = tiktoken.get_encoding("p50k_base")
+                except Exception:
+                    # If all else fails, fall back to whitespace tokenization
+                    return len(text.split())
+        
+        # Use the encoding to count tokens
+        tokens = encoding.encode(text)
+        return len(tokens)
+    else:
+        # Fallback to simple whitespace tokenization
+        return len(text.split())
 
 
 def generate_tree(root_dir: str, exclusions: List[str], prefix: str = "") -> str:
@@ -207,6 +240,7 @@ def process_codebase(
     output_file: str, 
     exclusions: List[str], 
     include_patterns: List[str] = None,
+    token_model: str = "gpt-4",
     show_progress: bool = True, 
     overwrite: bool = False
 ) -> None:
@@ -243,6 +277,12 @@ def process_codebase(
     included_files = []
     total_size = 0
     included_size = 0
+    
+    # Token count notice
+    if TIKTOKEN_AVAILABLE:
+        print(f"🔢 Using OpenAI's tiktoken for accurate token counting (model: {token_model})")
+    else:
+        print("🔢 Note: For accurate token counting, install tiktoken: pip install tiktoken")
     
     print(f"📊 Scanning directory: {root_dir}")
     start_time = time.time()
@@ -323,8 +363,8 @@ def process_codebase(
         # Read file
         content = read_file(file_path)
         
-        # Count tokens
-        file_tokens = count_tokens(content)
+        # Count tokens in this file
+        file_tokens = count_tokens(content, token_model)
         total_tokens += file_tokens
         
         # Add to all content
@@ -337,42 +377,68 @@ def process_codebase(
     process_time = time.time() - process_start
     print(f"🔄 Files processed in {process_time:.2f}s")
     
+    # Prepare full output content
+    full_output = ""
+    
+    # Prepare header content with token information
+    token_info = f"Total Tokens: {total_tokens}"
+    if TIKTOKEN_AVAILABLE:
+        token_info += f" (counted with tiktoken using {token_model} model)"
+    else:
+        token_info += " (estimated with basic whitespace tokenization)"
+    
+    header_content = token_info + "\n\n"
+    
+    # Note about selective inclusion if applicable
+    if include_patterns:
+        header_content += f"Note: Only selected files are included with content. Inclusion patterns: {', '.join(include_patterns)}\n\n"
+    
+    # Tree and file lists
+    tree_content = f"Directory Structure:\n\n{tree}\n\n"
+    tree_content += "All Files (Structure Only):\n\n"
+    for file_path in all_files:
+        rel_path = os.path.relpath(file_path, root_dir)
+        tree_content += f"- {rel_path}\n"
+    
+    # If selective inclusion, list included files
+    if include_patterns:
+        tree_content += "\nFiles With Content Included:\n\n"
+        for file_path in included_files:
+            rel_path = os.path.relpath(file_path, root_dir)
+            tree_content += f"- {rel_path}\n"
+    
+    # Combine everything
+    full_output = header_content + tree_content + all_content
+    
+    # Count tokens in the full output (including all the added structure)
+    final_token_count = count_tokens(full_output, token_model)
+    
+    # Update the token count in the header to reflect the complete file
+    updated_token_info = f"Total Tokens: {final_token_count}"
+    if TIKTOKEN_AVAILABLE:
+        updated_token_info += f" (counted with tiktoken using {token_model} model)"
+    else:
+        updated_token_info += " (estimated with basic whitespace tokenization)"
+    
+    # Replace the original token info with the updated one
+    full_output = full_output.replace(token_info, updated_token_info)
+    
     # Write output file
     print(f"💾 Writing output to: {output_file}")
     write_start = time.time()
     
     with open(output_file, 'w', encoding='utf-8') as f:
-        # Write token count
-        f.write(f"Total Tokens: {total_tokens}\n\n")
-        
-        # Note about selective inclusion if applicable
-        if include_patterns:
-            f.write(f"Note: Only selected files are included with content. Inclusion patterns: {', '.join(include_patterns)}\n\n")
-        
-        # Write file tree
-        f.write(f"Directory Structure:\n\n{tree}\n\n")
-        
-        # Write list of all files
-        f.write("All Files (Structure Only):\n\n")
-        for file_path in all_files:
-            rel_path = os.path.relpath(file_path, root_dir)
-            f.write(f"- {rel_path}\n")
-        
-        # If selective inclusion, write list of included files
-        if include_patterns:
-            f.write("\nFiles With Content Included:\n\n")
-            for file_path in included_files:
-                rel_path = os.path.relpath(file_path, root_dir)
-                f.write(f"- {rel_path}\n")
-        
-        # Write all content
-        f.write(all_content)
+        f.write(full_output)
     
     write_time = time.time() - write_start
     total_time = time.time() - start_time
     
     print(f"💾 Output file written in {write_time:.2f}s")
-    print(f"✅ Extraction complete! Total tokens: {total_tokens}")
+    if TIKTOKEN_AVAILABLE:
+        print(f"✅ Extraction complete! Total tokens: {final_token_count} (accurate count for {token_model})")
+    else:
+        print(f"✅ Extraction complete! Total tokens: {final_token_count} (estimated)")
+        print("   For accurate token counting, install tiktoken: pip install tiktoken")
     print(f"⏱️ Total time: {total_time:.2f}s")
 
 
@@ -427,6 +493,8 @@ def main():
                         help="Exclude patterns (can be used multiple times)")
     parser.add_argument("--include", "-i", dest="include", default=None,
                         help="Only include content for these files or directories (space or comma separated)")
+    parser.add_argument("--model", "-m", dest="token_model", default="gpt-4",
+                        help="Model to use for token counting (default: gpt-4)")
     parser.add_argument("--no-defaults", dest="no_defaults", action="store_true",
                         help="Don't use default exclusions")
     parser.add_argument("--no-progress", dest="no_progress", action="store_true",
@@ -451,7 +519,8 @@ def main():
         args.root_dir, 
         args.output_file, 
         exclusions,
-        include_patterns, 
+        include_patterns,
+        args.token_model,
         not args.no_progress, 
         args.force
     )
